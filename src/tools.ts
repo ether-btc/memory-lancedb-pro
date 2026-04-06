@@ -9,7 +9,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { MemoryRetriever, RetrievalResult } from "./retriever.js";
-import type { MemoryStore } from "./store.js";
+import type { MemoryEntry, MemoryStore } from "./store.js";
 import { isNoise } from "./noise-filter.js";
 import { isSystemBypassId, resolveScopeFilter, parseAgentIdFromSessionKey, type MemoryScopeManager } from "./scopes.js";
 import type { Embedder } from "./embedder.js";
@@ -1263,8 +1263,9 @@ export function registerMemoryUpdateTool(
           // --- Temporal supersede guard ---
           // For temporal-versioned categories (preferences/entities), changing
           // text must go through supersede to preserve the history chain.
+          let existing: MemoryEntry | null = null;
           if (text && newVector) {
-            const existing = await context.store.getById(resolvedId, scopeFilter);
+            existing = await context.store.getById(resolvedId, scopeFilter);
             if (existing) {
               const meta = parseSmartMetadata(existing.metadata, existing);
               if (TEMPORAL_VERSIONED_CATEGORIES.has(meta.memory_category)) {
@@ -1353,6 +1354,41 @@ export function registerMemoryUpdateTool(
           if (importance !== undefined)
             updates.importance = clamp01(importance, 0.7);
           if (category) updates.category = category;
+
+          // Rebuild smart metadata when text or importance changes (#544)
+          if (text && existing) {
+            const meta = parseSmartMetadata(existing.metadata, existing);
+            const effectiveCategory = category
+              ? (category as string)
+              : meta.memory_category;
+            const newExpiry = inferExpiry(text);
+            const updatedMeta = buildSmartMetadata(existing, {
+              l0_abstract: text,
+              l1_overview: `- ${text}`,
+              l2_content: text,
+              fact_key: deriveFactKey(effectiveCategory, text),
+              memory_temporal_type: classifyTemporal(text),
+              // Pass 0 when no expiry so buildSmartMetadata clears the old value
+              // (undefined means "keep existing" in buildSmartMetadata)
+              valid_until: newExpiry ?? (0 as any),
+              confidence:
+                importance !== undefined
+                  ? clamp01(importance, 0.7)
+                  : meta.confidence,
+            });
+            updates.metadata = stringifySmartMetadata(updatedMeta);
+          } else if (importance !== undefined && !text) {
+            // Sync confidence for importance-only changes
+            const entry =
+              existing ?? (await context.store.getById(resolvedId, scopeFilter));
+            if (entry) {
+              const meta = parseSmartMetadata(entry.metadata, entry);
+              const updatedMeta = buildSmartMetadata(entry, {
+                confidence: clamp01(importance, 0.7),
+              });
+              updates.metadata = stringifySmartMetadata(updatedMeta);
+            }
+          }
 
           const updated = await context.store.update(
             resolvedId,
