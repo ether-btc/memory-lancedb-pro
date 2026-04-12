@@ -953,7 +953,7 @@ export class MemoryRetriever {
         bm25Results = bm25Result_.value;
       }
 
-      if (vectorResults.length === 0 && bm25Results.length === 0) {
+      if (vectorResult_.status === 'rejected' && bm25Result_.status === 'rejected') {
         throw attachFailureStage(
           new Error("both vector and BM25 search failed"),
           "hybrid.parallelSearch",
