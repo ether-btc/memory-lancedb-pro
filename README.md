@@ -910,3 +910,8 @@ MIT
 ## My WeChat QR Code
 
 <img src="https://github.com/win4r/AISuperDomain/assets/42172631/7568cf78-c8ba-4182-aa96-d524d903f2bc" width="214.8" height="291">
+
+---
+
+If this saved you time or made your day a little better, consider sharing a coffee — and keep the ideas flowing.
+[konto.fkey.id](https://konto.fkey.id/)
