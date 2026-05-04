@@ -1,0 +1,106 @@
+name: Skill CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  skill-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate SKILL.md exists
+        run: |
+          if [ ! -f SKILL.md ]; then
+            echo "::error::SKILL.md not found at repository root"
+            exit 1
+          fi
+          echo "SKILL.md found"
+
+      - name: Validate deps.yaml exists
+        run: |
+          if [ ! -f deps.yaml ]; then
+            echo "::error::deps.yaml not found at repository root"
+            exit 1
+          fi
+          echo "deps.yaml found"
+
+  version-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: |
+          pkg_ver=$(node -p "JSON.parse(require(fs).readFileSync(package.json,utf8)).version")
+          plugin_ver=$(node -p "JSON.parse(require(fs).readFileSync(openclaw.plugin.json,utf8)).version")
+          if [ "$pkg_ver" != "$plugin_ver" ]; then
+            echo "::error::Version mismatch: package.json=$pkg_ver, openclaw.plugin.json=$plugin_ver"
+            exit 1
+          fi
+          echo "Versions match: $pkg_ver"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+        continue-on-error: true
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run CLI smoke tests
+        run: npm run test:cli-smoke
+
+      - name: Run core regression tests
+        run: npm run test:core-regression
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package and workflow tests
+        run: npm run test:packaging-and-workflow
