@@ -1,3 +1,9 @@
+---
+name: memory-lancedb-pro
+description: LanceDB-backed persistent memory plugin for OpenClaw/Hermes with hybrid vector + BM25 retrieval and cross-encoder reranking
+tags: [memory, lancedb, vector-search, hermes-plugin, typescript, openclaw]
+---
+
 # memory-lancedb-pro Skill
 
 ## Description
